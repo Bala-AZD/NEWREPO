@@ -5,4 +5,4 @@
           username: ${{ secrets.UBUNTU_VM_USER }}
           password: ${{ secrets.UBUNTU_VM_PASSWORD }}
           script: |
-            echo "SSH connection successful"
+            echo "SSH connection is successful"
