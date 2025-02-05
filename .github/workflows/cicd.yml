@@ -1,0 +1,69 @@
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Code Checkout
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      # Step 2: Code Review with SonarQube
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v2.0
+        with:
+          projectBaseDir: './'
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: bala-azd
+
+      # Step 3: Docker Login
+      - name: Docker Login
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # Step 4: Docker Build and Push
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/my-app:${{ github.sha }} .
+
+      - name: Push Docker Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/my-app:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      # Step 5: Docker Pull and Deploy
+      - name: Docker Login
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Pull Docker Image
+        run: docker pull ${{ secrets.DOCKER_USERNAME }}/my-app:${{ github.sha }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f deployment.yaml
+          kubectl rollout status deployment/my-app-deployment
+
+# Notify on failure using Telegram (Optional)
+  notify_failure:
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Send Telegram Notification on Failure
+        uses: appleboy/telegram-action@0.3.2
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: 'CI/CD pipeline failed for commit ${{ github.sha }}'
